@@ -83,7 +83,8 @@ function Transcript({
           {transcriptItems.map((item) => {
             const { itemId, type, role, data, expanded, timestamp, title = "", isHidden } = item;
 
-            if (isHidden) {
+            // Always show user messages even if isHidden is true
+            if (isHidden && role !== "user") {
               return null;
             }
 

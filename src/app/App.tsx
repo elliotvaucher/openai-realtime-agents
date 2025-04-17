@@ -67,12 +67,39 @@ function App() {
     }
   };
 
+  const cancelAssistantSpeech = async () => {
+    const mostRecentAssistantMessage = [...transcriptItems]
+      .reverse()
+      .find((item) => item.role === "assistant");
+
+    if (!mostRecentAssistantMessage) {
+      console.warn("can't cancel, no recent assistant message found");
+      return;
+    }
+    if (mostRecentAssistantMessage.status === "DONE") {
+      console.log("No truncation needed, message is DONE");
+      return;
+    }
+
+    sendClientEvent({
+      type: "conversation.item.truncate",
+      item_id: mostRecentAssistantMessage?.itemId,
+      content_index: 0,
+      audio_end_ms: Date.now() - mostRecentAssistantMessage.createdAtMs,
+    });
+    sendClientEvent(
+      { type: "response.cancel" },
+      "(cancel due to user interruption)"
+    );
+  };
+
   const handleServerEventRef = useHandleServerEvent({
     setSessionStatus,
     selectedAgentName,
     selectedAgentConfigSet,
     sendClientEvent,
     setSelectedAgentName,
+    cancelAssistantSpeech,
   });
 
   useEffect(() => {
@@ -202,7 +229,8 @@ function App() {
 
   const sendSimulatedUserMessage = (text: string) => {
     const id = uuidv4().slice(0, 32);
-    addTranscriptMessage(id, "user", text, true);
+    console.log("DEBUG: Sending simulated user message", { text, id });
+    addTranscriptMessage(id, "user", text, false);
 
     sendClientEvent(
       {
@@ -266,40 +294,21 @@ function App() {
     }
   };
 
-  const cancelAssistantSpeech = async () => {
-    const mostRecentAssistantMessage = [...transcriptItems]
-      .reverse()
-      .find((item) => item.role === "assistant");
-
-    if (!mostRecentAssistantMessage) {
-      console.warn("can't cancel, no recent assistant message found");
-      return;
-    }
-    if (mostRecentAssistantMessage.status === "DONE") {
-      console.log("No truncation needed, message is DONE");
-      return;
-    }
-
-    sendClientEvent({
-      type: "conversation.item.truncate",
-      item_id: mostRecentAssistantMessage?.itemId,
-      content_index: 0,
-      audio_end_ms: Date.now() - mostRecentAssistantMessage.createdAtMs,
-    });
-    sendClientEvent(
-      { type: "response.cancel" },
-      "(cancel due to user interruption)"
-    );
-  };
-
   const handleSendTextMessage = () => {
     if (!userText.trim()) return;
     cancelAssistantSpeech();
+
+    console.log("DEBUG: User sending text message", { userText });
+    
+    const id = uuidv4().slice(0, 32);
+    console.log("DEBUG: Creating user message with ID", id);
+    addTranscriptMessage(id, "user", userText.trim(), false);
 
     sendClientEvent(
       {
         type: "conversation.item.create",
         item: {
+          id,
           type: "message",
           role: "user",
           content: [{ type: "input_text", text: userText.trim() }],
@@ -417,7 +426,7 @@ function App() {
             />
           </div>
           <div>
-            Realtime API <span className="text-gray-500">Agents</span>
+            Gemperli X RITSL <span className="text-gray-500">Médiation</span>
           </div>
         </div>
         <div className="flex items-center">

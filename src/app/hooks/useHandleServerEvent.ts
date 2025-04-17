@@ -12,6 +12,7 @@ export interface UseHandleServerEventParams {
   sendClientEvent: (eventObj: any, eventNameSuffix?: string) => void;
   setSelectedAgentName: (name: string) => void;
   shouldForceResponse?: boolean;
+  cancelAssistantSpeech?: () => void;
 }
 
 export function useHandleServerEvent({
@@ -20,6 +21,7 @@ export function useHandleServerEvent({
   selectedAgentConfigSet,
   sendClientEvent,
   setSelectedAgentName,
+  cancelAssistantSpeech,
 }: UseHandleServerEventParams) {
   const {
     transcriptItems,
@@ -118,6 +120,14 @@ export function useHandleServerEvent({
         break;
       }
 
+      case "input_audio.voice_activity.detected": {
+        if (cancelAssistantSpeech) {
+          console.log("Voice activity detected, cancelling assistant speech");
+          cancelAssistantSpeech();
+        }
+        break;
+      }
+
       case "conversation.item.created": {
         let text =
           serverEvent.item?.content?.[0]?.text ||
@@ -126,15 +136,31 @@ export function useHandleServerEvent({
         const role = serverEvent.item?.role as "user" | "assistant";
         const itemId = serverEvent.item?.id;
 
+        console.log("DEBUG: conversation.item.created", { 
+          text, 
+          role, 
+          itemId,
+          content: serverEvent.item?.content,
+          hasContent: !!serverEvent.item?.content,
+          contentLength: serverEvent.item?.content?.length,
+          firstContent: serverEvent.item?.content?.[0],
+          fullItem: serverEvent.item
+        });
+
         if (itemId && transcriptItems.some((item) => item.itemId === itemId)) {
+          console.log("DEBUG: Skipping item that already exists in transcript", itemId);
           break;
         }
 
         if (itemId && role) {
           if (role === "user" && !text) {
             text = "[Transcribing...]";
+            console.log("DEBUG: Setting transcribing placeholder for user");
           }
+          console.log("DEBUG: Adding transcript message", { itemId, role, text });
           addTranscriptMessage(itemId, role, text);
+        } else {
+          console.log("DEBUG: Missing required data for transcript", { itemId, role });
         }
         break;
       }
